@@ -1,0 +1,25 @@
+# Python virtual environment & bytecode
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Private user data & phone numbers
+contacts.json
+*.log
+jarvis_stdout.log
+
+# macOS System Files
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# User Notes & temporary cache
+temp/
+recordings/

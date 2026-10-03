@@ -1,0 +1,2437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>J.A.R.V.I.S. // Autonomous Mission Control</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800;900&family=Rajdhani:wght@500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg: #050b14;
+      --panel-bg: rgba(6, 18, 36, 0.78);
+      --panel-border: rgba(0, 240, 255, 0.25);
+      --panel-hover: rgba(0, 240, 255, 0.45);
+      --cyan: #00f0ff;
+      --cyan-dim: rgba(0, 240, 255, 0.15);
+      --cyan-glow: 0 0 16px rgba(0, 240, 255, 0.5);
+      --gold: #ffb700;
+      --gold-dim: rgba(255, 183, 0, 0.18);
+      --gold-glow: 0 0 16px rgba(255, 183, 0, 0.5);
+      --red: #ff3344;
+      --text: #e0f4ff;
+      --text-muted: #7ca8c4;
+      --font-display: 'Orbitron', -apple-system, sans-serif;
+      --font-body: 'Rajdhani', -apple-system, sans-serif;
+      --font-mono: 'Share Tech Mono', monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-body);
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    /* Cybernetic Grid & Vignette */
+    body::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(circle at center, transparent 40%, rgba(2, 6, 12, 0.85) 100%),
+        linear-gradient(rgba(0, 240, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 240, 255, 0.03) 1px, transparent 1px);
+      background-size: 100% 100%, 36px 36px, 36px 36px;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    /* Scanline Sweep */
+    body::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to bottom, transparent 50%, rgba(0, 0, 0, 0.25) 51%);
+      background-size: 100% 4px;
+      pointer-events: none;
+      z-index: 2;
+      opacity: 0.65;
+    }
+
+    /* Top HUD Header */
+    header {
+      position: relative;
+      z-index: 10;
+      height: 56px;
+      border-bottom: 1px solid var(--panel-border);
+      background: rgba(3, 10, 22, 0.85);
+      backdrop-filter: blur(12px);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .persona-badge {
+      font-family: var(--font-display);
+      font-size: 15px;
+      font-weight: 800;
+      letter-spacing: 2px;
+      color: var(--cyan);
+      padding: 4px 14px;
+      border: 1px solid var(--cyan);
+      border-radius: 4px;
+      background: var(--cyan-dim);
+      box-shadow: var(--cyan-glow);
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .persona-badge:hover {
+      background: var(--cyan);
+      color: #030a16;
+    }
+
+    .header-center {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-family: var(--font-display);
+      font-size: 12px;
+      letter-spacing: 2px;
+      color: var(--text-muted);
+    }
+
+    .status-pill {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      padding: 3px 10px;
+      border-radius: 4px;
+      letter-spacing: 1px;
+      transition: all 0.3s ease;
+    }
+
+    .status-online {
+      color: var(--cyan);
+      border: 1px solid var(--cyan);
+      background: var(--cyan-dim);
+      box-shadow: 0 0 8px rgba(0, 240, 255, 0.4);
+    }
+
+    .status-offline {
+      color: var(--gold);
+      border: 1px solid var(--gold);
+      background: var(--gold-dim);
+      box-shadow: 0 0 8px rgba(255, 183, 0, 0.4);
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .hud-clock {
+      font-family: var(--font-mono);
+      font-size: 15px;
+      color: var(--cyan);
+      letter-spacing: 2px;
+      margin-right: 8px;
+    }
+
+    .btn-top {
+      font-family: var(--font-display);
+      font-size: 10px;
+      letter-spacing: 1.5px;
+      color: var(--cyan);
+      background: rgba(0, 240, 255, 0.08);
+      border: 1px solid var(--panel-border);
+      padding: 5px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .btn-top:hover {
+      background: var(--cyan);
+      color: #000;
+      box-shadow: var(--cyan-glow);
+    }
+
+    /* Primary Navigation Tab Bar */
+    nav {
+      position: relative;
+      z-index: 10;
+      height: 44px;
+      background: rgba(4, 12, 26, 0.95);
+      border-bottom: 1px solid var(--panel-border);
+      display: flex;
+      align-items: center;
+      padding: 0 20px;
+      gap: 6px;
+    }
+
+    .nav-tab {
+      font-family: var(--font-display);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      padding: 8px 18px;
+      color: var(--text-muted);
+      border: 1px solid transparent;
+      border-radius: 4px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.25s ease;
+    }
+
+    .nav-tab:hover {
+      color: var(--cyan);
+      background: rgba(0, 240, 255, 0.06);
+    }
+
+    .nav-tab.active {
+      color: #050b14;
+      background: var(--cyan);
+      border-color: var(--cyan);
+      box-shadow: var(--cyan-glow);
+    }
+
+    /* Content Views Container */
+    #views-container {
+      position: relative;
+      z-index: 5;
+      flex: 1;
+      overflow: hidden;
+      display: flex;
+    }
+
+    .view-page {
+      display: none;
+      width: 100%;
+      height: 100%;
+      padding: 16px 24px;
+      overflow-y: auto;
+    }
+
+    .view-page.active {
+      display: flex;
+      gap: 20px;
+    }
+
+    /* Glass Panels */
+    .glass-panel {
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 6px;
+      backdrop-filter: blur(16px);
+      padding: 18px;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .glass-panel::before {
+      content: "";
+      position: absolute;
+      top: 0; left: 0; width: 6px; height: 6px;
+      border-top: 2px solid var(--cyan);
+      border-left: 2px solid var(--cyan);
+    }
+    .glass-panel::after {
+      content: "";
+      position: absolute;
+      bottom: 0; right: 0; width: 6px; height: 6px;
+      border-bottom: 2px solid var(--cyan);
+      border-right: 2px solid var(--cyan);
+    }
+
+    .panel-header {
+      font-family: var(--font-display);
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 2px;
+      color: var(--cyan);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid rgba(0, 240, 255, 0.15);
+    }
+
+    /* VIEW 1: MISSION CONTROL LAYOUT */
+    .col-telemetry { flex: 0 0 320px; display: flex; flex-direction: column; gap: 14px; }
+    .col-center { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: space-between; }
+    .col-feed { flex: 0 0 350px; display: flex; flex-direction: column; gap: 14px; }
+
+    /* Metric Bars */
+    .metric-row { margin-bottom: 10px; }
+    .metric-top { display: flex; justify-content: space-between; font-size: 12px; font-weight: 600; margin-bottom: 4px; }
+    .metric-val { font-family: var(--font-mono); color: var(--cyan); }
+    .progress-bar-bg { width: 100%; height: 7px; background: rgba(0, 240, 255, 0.1); border-radius: 4px; overflow: hidden; }
+    .progress-bar-fill { height: 100%; background: linear-gradient(90deg, #007799, var(--cyan)); width: 0%; transition: width 0.4s ease; box-shadow: 0 0 8px var(--cyan); }
+
+    /* Tiles Grid */
+    .tiles-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+    }
+
+    .tile-card {
+      background: rgba(0, 240, 255, 0.05);
+      border: 1px solid rgba(0, 240, 255, 0.2);
+      border-radius: 5px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .tile-card:hover {
+      background: rgba(0, 240, 255, 0.15);
+      border-color: var(--cyan);
+      box-shadow: 0 0 12px rgba(0, 240, 255, 0.35);
+      transform: translateY(-2px);
+    }
+
+    .tile-icon { font-size: 20px; }
+    .tile-label { font-family: var(--font-display); font-size: 11px; font-weight: 700; letter-spacing: 1px; color: var(--cyan); }
+    .tile-sub { font-size: 11px; color: var(--text-muted); }
+
+    /* Center Visualizer */
+    .reactor-box {
+      position: relative;
+      width: 320px;
+      height: 320px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #reactor-canvas {
+      position: absolute;
+      top: 0; left: 0;
+      width: 320px;
+      height: 320px;
+    }
+
+    .reactor-status-badge {
+      position: absolute;
+      bottom: -28px;
+      font-family: var(--font-display);
+      font-size: 11px;
+      letter-spacing: 2px;
+      padding: 4px 14px;
+      border: 1px solid var(--cyan);
+      border-radius: 12px;
+      color: var(--cyan);
+      background: rgba(0, 240, 255, 0.08);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .status-dot {
+      width: 8px; height: 8px; border-radius: 50%; background: var(--cyan);
+      box-shadow: 0 0 8px var(--cyan);
+      animation: pulseDot 1.5s infinite;
+    }
+
+    @keyframes pulseDot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.7); }
+    }
+
+    /* Waveform visualizer */
+    .vis-wave {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      height: 28px;
+      width: 100%;
+      margin-top: 36px;
+    }
+
+    .vis-bar {
+      width: 4px;
+      height: 6px;
+      background: var(--cyan);
+      border-radius: 2px;
+      box-shadow: 0 0 6px var(--cyan);
+      transition: height 0.08s ease;
+    }
+
+    /* Quick App Launcher Bar (Center Bottom) */
+    .quick-apps-strip {
+      width: 100%;
+      background: rgba(0, 240, 255, 0.04);
+      border: 1px solid rgba(0, 240, 255, 0.18);
+      border-radius: 6px;
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .app-chip {
+      flex: 1;
+      padding: 6px 10px;
+      text-align: center;
+      font-family: var(--font-display);
+      font-size: 10px;
+      letter-spacing: 1px;
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(0, 240, 255, 0.15);
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+    }
+
+    .app-chip:hover {
+      background: var(--cyan);
+      color: #000;
+      border-color: var(--cyan);
+      box-shadow: 0 0 10px rgba(0, 240, 255, 0.4);
+    }
+
+    /* Feed Console */
+    .feed-container {
+      flex: 1;
+      background: rgba(0, 0, 0, 0.45);
+      border: 1px solid rgba(0, 240, 255, 0.15);
+      border-radius: 4px;
+      padding: 10px;
+      overflow-y: auto;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .feed-msg {
+      padding: 6px 10px;
+      border-radius: 3px;
+      border-left: 2px solid;
+      line-height: 1.4;
+      animation: fadeIn 0.25s ease-in;
+    }
+
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+    .feed-user { border-color: var(--cyan); background: rgba(0, 240, 255, 0.05); color: #d0f7ff; }
+    .feed-agent { border-color: var(--gold); background: rgba(255, 183, 0, 0.06); color: #fff1d0; }
+    .feed-system { border-color: #557799; background: rgba(255, 255, 255, 0.03); color: #99bbcc; }
+
+    /* Contacts List in Right Panel */
+    .contact-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(0, 240, 255, 0.04);
+      border: 1px solid rgba(0, 240, 255, 0.15);
+      border-radius: 4px;
+      padding: 8px 12px;
+      margin-bottom: 8px;
+    }
+
+    .contact-info { display: flex; flex-direction: column; }
+    .contact-name { font-weight: 700; font-size: 13px; color: var(--cyan); }
+    .contact-phone { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); }
+    .contact-actions { display: flex; gap: 6px; }
+
+    .btn-contact {
+      padding: 4px 8px;
+      font-size: 11px;
+      font-family: var(--font-display);
+      border-radius: 3px;
+      border: 1px solid;
+      background: transparent;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .btn-wa { border-color: #25d366; color: #25d366; }
+    .btn-wa:hover { background: #25d366; color: #000; box-shadow: 0 0 8px #25d366; }
+    .btn-call { border-color: var(--cyan); color: var(--cyan); }
+    .btn-call:hover { background: var(--cyan); color: #000; box-shadow: 0 0 8px var(--cyan); }
+
+    /* VIEW 2: ALL APPS LAUNCHER */
+    .view-apps-container {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .search-bar-box {
+      display: flex;
+      gap: 12px;
+    }
+
+    .search-input {
+      flex: 1;
+      background: rgba(0, 240, 255, 0.05);
+      border: 1px solid var(--panel-border);
+      border-radius: 4px;
+      padding: 10px 16px;
+      color: #fff;
+      font-family: var(--font-display);
+      font-size: 13px;
+      letter-spacing: 1px;
+      outline: none;
+      transition: all 0.2s ease;
+    }
+
+    .search-input:focus {
+      border-color: var(--cyan);
+      box-shadow: var(--cyan-glow);
+    }
+
+    .apps-catalog-grid {
+      flex: 1;
+      overflow-y: auto;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 12px;
+      padding-right: 6px;
+    }
+
+    .app-card {
+      background: rgba(0, 240, 255, 0.04);
+      border: 1px solid rgba(0, 240, 255, 0.16);
+      border-radius: 6px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 10px;
+      cursor: pointer;
+      transition: all 0.25s ease;
+    }
+
+    .app-card:hover {
+      background: rgba(0, 240, 255, 0.14);
+      border-color: var(--cyan);
+      transform: translateY(-2px);
+      box-shadow: 0 0 12px rgba(0, 240, 255, 0.35);
+    }
+
+    .app-card-title {
+      font-family: var(--font-display);
+      font-size: 13px;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .app-card-btn {
+      font-family: var(--font-display);
+      font-size: 10px;
+      padding: 5px;
+      text-align: center;
+      background: var(--cyan-dim);
+      border: 1px solid var(--cyan);
+      color: var(--cyan);
+      border-radius: 3px;
+    }
+
+    .app-card:hover .app-card-btn {
+      background: var(--cyan);
+      color: #000;
+    }
+
+    /* VIEW 3: COMMUNICATIONS */
+    .view-comms-container {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      gap: 20px;
+    }
+
+    .comms-left { flex: 1; display: flex; flex-direction: column; gap: 14px; }
+    .comms-right { flex: 1; display: flex; flex-direction: column; gap: 14px; }
+
+    .composer-box {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .composer-input, .composer-textarea {
+      background: rgba(0, 0, 0, 0.45);
+      border: 1px solid var(--panel-border);
+      border-radius: 4px;
+      padding: 10px 14px;
+      color: #fff;
+      font-family: var(--font-body);
+      font-size: 14px;
+      outline: none;
+    }
+
+    .composer-input:focus, .composer-textarea:focus {
+      border-color: var(--cyan);
+      box-shadow: var(--cyan-glow);
+    }
+
+    .composer-textarea { resize: none; height: 110px; font-family: sans-serif; }
+
+    .btn-send {
+      padding: 10px 20px;
+      font-family: var(--font-display);
+      font-size: 12px;
+      letter-spacing: 2px;
+      font-weight: 700;
+      background: var(--cyan);
+      color: #000;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .btn-send:hover {
+      box-shadow: var(--cyan-glow);
+      transform: translateY(-1px);
+    }
+
+    /* VIEW 4: STUDY & IITP PORTALS */
+    .study-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+      width: 100%;
+    }
+
+    .timer-display-box {
+      grid-column: span 3;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 30px;
+      gap: 16px;
+    }
+
+    .timer-ring-text {
+      font-family: var(--font-display);
+      font-size: 54px;
+      font-weight: 900;
+      color: var(--cyan);
+      text-shadow: 0 0 20px var(--cyan);
+    }
+
+    .timer-controls {
+      display: flex;
+      gap: 12px;
+    }
+
+    .btn-timer-preset {
+      font-family: var(--font-display);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      padding: 8px 18px;
+      border-radius: 4px;
+      border: 1px solid var(--panel-border);
+      background: rgba(0, 240, 255, 0.08);
+      color: var(--cyan);
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .btn-timer-preset:hover {
+      background: var(--cyan);
+      color: #000;
+      box-shadow: var(--cyan-glow);
+    }
+
+    /* VIEW 5: NOTES & MEMOS */
+    .notes-container {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      gap: 20px;
+    }
+
+    .notes-list-col {
+      flex: 0 0 340px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .notes-cards-box {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding-right: 4px;
+    }
+
+    .note-card {
+      background: rgba(0, 240, 255, 0.04);
+      border: 1px solid rgba(0, 240, 255, 0.18);
+      border-radius: 4px;
+      padding: 12px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .note-card:hover, .note-card.active {
+      background: rgba(0, 240, 255, 0.12);
+      border-color: var(--cyan);
+    }
+
+    .note-card-title {
+      font-family: var(--font-display);
+      font-size: 13px;
+      color: var(--cyan);
+      font-weight: 700;
+    }
+
+    .note-card-date {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .note-card-snippet {
+      font-size: 12px;
+      color: #ccc;
+      margin-top: 6px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .notes-editor-col {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    /* VIEW 6: SYSTEM & CONTROLS */
+    .system-controls-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      width: 100%;
+    }
+
+    .control-card {
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 6px;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .control-card-title {
+      font-family: var(--font-display);
+      font-size: 13px;
+      font-weight: 800;
+      color: var(--cyan);
+      letter-spacing: 1.5px;
+    }
+
+    /* Bottom Universal Command Console */
+    footer {
+      position: relative;
+      z-index: 10;
+      background: rgba(3, 10, 22, 0.95);
+      border-top: 1px solid var(--panel-border);
+      padding: 10px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .command-suggestions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 2px;
+    }
+
+    .sug-pill {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-muted);
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(0, 240, 255, 0.15);
+      border-radius: 12px;
+      padding: 3px 12px;
+      white-space: nowrap;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .sug-pill:hover {
+      color: var(--cyan);
+      border-color: var(--cyan);
+      background: var(--cyan-dim);
+    }
+
+    .command-bar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .mic-button {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      border: 1px solid var(--cyan);
+      background: var(--cyan-dim);
+      color: var(--cyan);
+      font-size: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      flex-shrink: 0;
+    }
+
+    .mic-button:hover {
+      background: var(--cyan);
+      color: #000;
+      box-shadow: var(--cyan-glow);
+    }
+
+    .mic-button.active {
+      border-color: var(--gold);
+      background: var(--gold);
+      color: #000;
+      box-shadow: var(--gold-glow);
+      animation: pulseMic 1s infinite alternate;
+    }
+
+    @keyframes pulseMic {
+      from { transform: scale(1); }
+      to { transform: scale(1.1); }
+    }
+
+    .command-input {
+      flex: 1;
+      height: 44px;
+      background: rgba(0, 0, 0, 0.6);
+      border: 1px solid var(--panel-border);
+      border-radius: 6px;
+      padding: 0 16px;
+      font-family: var(--font-body);
+      font-size: 15px;
+      color: #fff;
+      outline: none;
+      letter-spacing: 0.5px;
+      transition: all 0.25s ease;
+    }
+
+    .command-input:focus {
+      border-color: var(--cyan);
+      box-shadow: 0 0 12px rgba(0, 240, 255, 0.35);
+    }
+
+    .btn-execute {
+      height: 44px;
+      padding: 0 24px;
+      font-family: var(--font-display);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 2px;
+      color: #000;
+      background: var(--cyan);
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .btn-execute:hover {
+      box-shadow: var(--cyan-glow);
+      transform: translateY(-1px);
+    }
+
+    /* Scrollbars */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.3); }
+    ::-webkit-scrollbar-thumb { background: rgba(0, 240, 255, 0.25); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--cyan); }
+  </style>
+</head>
+<body>
+
+  <!-- Top Header -->
+  <header>
+    <div class="brand">
+      <div class="persona-badge" id="persona-toggle-btn" onclick="togglePersona()">J.A.R.V.I.S.</div>
+      <div style="font-family:var(--font-display); font-size:11px; letter-spacing:1.5px; color:var(--cyan);">
+        IIT PATNA // GURUGRAM SECURE NODE
+      </div>
+    </div>
+
+    <div class="header-center">
+      <span>AUTONOMOUS MISSION CONTROL</span>
+      <span class="status-pill status-online" id="backend-status-pill">● BACKEND CONNECTED</span>
+      <span class="status-pill status-online" id="wake-listener-pill" style="cursor:pointer; background:rgba(0,240,255,0.15); border-color:var(--cyan); color:var(--cyan); box-shadow:0 0 10px rgba(0,240,255,0.3);" onclick="toggleWakeWordListener()" title="Click to Toggle Hands-Free Siri-Mode">🎙️ HEY JARVIS: ● ALWAYS LISTENING</span>
+    </div>
+
+    <div class="header-actions">
+      <div class="hud-clock" id="hud-clock">00:00:00</div>
+      <button class="btn-top" onclick="triggerAction('screenshot')">📸 SCREENSHOT</button>
+      <button class="btn-top" onclick="triggerAction('lock')">🔒 LOCK</button>
+      <button class="btn-top" onclick="toggleFullScreen()">⛶ FULLSCREEN</button>
+    </div>
+  </header>
+
+  <!-- Navigation Switcher Tabs -->
+  <nav>
+    <div class="nav-tab active" onclick="switchView('view-overview')">⚡ MISSION CONTROL</div>
+    <div class="nav-tab" onclick="switchView('view-apps')">🚀 ALL APPS (98)</div>
+    <div class="nav-tab" onclick="switchView('view-comms')">💬 COMMUNICATIONS</div>
+    <div class="nav-tab" onclick="switchView('view-study')">🎓 IITP & STUDY</div>
+    <div class="nav-tab" onclick="switchView('view-notes')">📝 NOTES & MEMOS</div>
+    <div class="nav-tab" onclick="switchView('view-system')">⚙️ SYSTEM CONTROLS</div>
+    <div class="nav-tab" onclick="switchView('view-backend')">💻 BACKEND & TERMINAL</div>
+  </nav>
+
+  <!-- Views Container -->
+  <div id="views-container">
+
+    <!-- VIEW 1: MISSION CONTROL OVERVIEW -->
+    <div class="view-page active" id="view-overview">
+      <!-- Left: Telemetry & Quick Tiles -->
+      <div class="col-telemetry">
+        <div class="glass-panel">
+          <div class="panel-header">
+            <span>HARDWARE TELEMETRY</span>
+            <span id="chip-tag" style="font-size:10px; color:var(--cyan);">APPLE M5</span>
+          </div>
+
+          <div class="metric-row">
+            <div class="metric-top">
+              <span>CPU UTILIZATION</span>
+              <span class="metric-val" id="cpu-val">0%</span>
+            </div>
+            <div class="progress-bar-bg">
+              <div class="progress-bar-fill" id="cpu-bar" style="width:0%;"></div>
+            </div>
+          </div>
+
+          <div class="metric-row">
+            <div class="metric-top">
+              <span>UNIFIED MEMORY</span>
+              <span class="metric-val" id="ram-val">0%</span>
+            </div>
+            <div class="progress-bar-bg">
+              <div class="progress-bar-fill" id="ram-bar" style="width:0%;"></div>
+            </div>
+            <div style="font-size:10px; color:var(--text-muted); margin-top:2px;" id="ram-details">0.0 / 16.0 GB</div>
+          </div>
+
+          <div class="metric-row">
+            <div class="metric-top">
+              <span>BATTERY POWER</span>
+              <span class="metric-val" id="battery-val">--%</span>
+            </div>
+            <div class="progress-bar-bg">
+              <div class="progress-bar-fill" id="battery-bar" style="width:0%;"></div>
+            </div>
+            <div style="font-size:10px; color:var(--text-muted); margin-top:2px;" id="power-source">Power: Detecting...</div>
+          </div>
+        </div>
+
+        <!-- Quick Execution Tiles -->
+        <div class="glass-panel" style="flex:1;">
+          <div class="panel-header">QUICK EXECUTION TILES</div>
+          <div class="tiles-grid">
+            <div class="tile-card" onclick="executeCommand('search manga on chrome')">
+              <div class="tile-icon">🌐</div>
+              <div class="tile-label">SEARCH MANGA</div>
+              <div class="tile-sub">Google Chrome</div>
+            </div>
+
+            <div class="tile-card" onclick="executeCommand('play lofi beats on youtube')">
+              <div class="tile-icon">🎵</div>
+              <div class="tile-label">LOFI RADIO</div>
+              <div class="tile-sub">YouTube Music</div>
+            </div>
+
+            <div class="tile-card" onclick="executeCommand('open moodle')">
+              <div class="tile-icon">🎓</div>
+              <div class="tile-label">IITP MOODLE</div>
+              <div class="tile-sub">CET Academic</div>
+            </div>
+
+            <div class="tile-card" onclick="executeCommand('open webmail')">
+              <div class="tile-icon">✉️</div>
+              <div class="tile-label">OUTLOOK MAIL</div>
+              <div class="tile-sub">Office 365</div>
+            </div>
+
+            <div class="tile-card" onclick="executeCommand('open instagram dms')">
+              <div class="tile-icon">📷</div>
+              <div class="tile-label">INSTAGRAM DM</div>
+              <div class="tile-sub">Direct Inbox</div>
+            </div>
+
+            <div class="tile-card" onclick="executeCommand('system status')">
+              <div class="tile-icon">⚡</div>
+              <div class="tile-label">DIAGNOSTICS</div>
+              <div class="tile-sub">Hardware Scan</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Center: Arc Reactor Visualizer & Quick App Bar -->
+      <div class="col-center">
+        <div style="flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+          <div class="reactor-box">
+            <canvas id="reactor-canvas" width="320" height="320"></canvas>
+            <div class="reactor-status-badge" id="status-badge">
+              <div class="status-dot" id="status-dot"></div>
+              <span id="status-text">SYSTEM ONLINE</span>
+            </div>
+          </div>
+
+          <div class="vis-wave" id="vis-container"></div>
+        </div>
+
+        <!-- Quick Access App Strip -->
+        <div class="quick-apps-strip">
+          <div class="app-chip" onclick="launchAppDirect('Google Chrome')">CHROME</div>
+          <div class="app-chip" onclick="launchAppDirect('Visual Studio Code')">VS CODE</div>
+          <div class="app-chip" onclick="launchAppDirect('WhatsApp')">WHATSAPP</div>
+          <div class="app-chip" onclick="launchAppDirect('Terminal')">TERMINAL</div>
+          <div class="app-chip" onclick="launchAppDirect('Calculator')">CALC</div>
+          <div class="app-chip" onclick="launchAppDirect('Notes')">NOTES</div>
+          <div class="app-chip" onclick="launchAppDirect('Spotify')">SPOTIFY</div>
+          <div class="app-chip" onclick="launchAppDirect('ChatGPT')">CHATGPT</div>
+          <div class="app-chip" onclick="launchAppDirect('Claude')">CLAUDE</div>
+        </div>
+      </div>
+
+      <!-- Right: Live Activity Feed & Speed Dial -->
+      <div class="col-feed">
+        <div class="glass-panel" style="flex:1;">
+          <div class="panel-header">
+            <span>LIVE INTELLIGENCE FEED</span>
+            <span style="font-size:10px; color:var(--text-muted); cursor:pointer;" onclick="clearFeed()">CLEAR</span>
+          </div>
+          <div class="feed-container" id="feed-box">
+            <div class="feed-msg feed-system">[SYSTEM] J.A.R.V.I.S. Autonomous Interface Initialized.</div>
+            <div class="feed-msg feed-agent">[J.A.R.V.I.S.] Complete system controls online for Deepak Siwach.</div>
+          </div>
+        </div>
+
+        <div class="glass-panel">
+          <div class="panel-header">
+            <span>SPEED COMMUNICATIONS</span>
+            <span style="font-size:10px; color:var(--cyan); cursor:pointer;" onclick="switchView('view-comms')">+ MORE</span>
+          </div>
+
+          <div class="contact-row">
+            <div class="contact-info">
+              <div class="contact-name">Dad (Father)</div>
+              <div class="contact-phone" id="phone-dad">Direct Line</div>
+            </div>
+            <div class="contact-actions">
+              <button class="btn-contact btn-wa" onclick="messageContact('Dad')">💬 WA</button>
+              <button class="btn-contact btn-call" onclick="callContact('Dad')">📞 CALL</button>
+            </div>
+          </div>
+
+          <div class="contact-row">
+            <div class="contact-info">
+              <div class="contact-name">Mom (Mother)</div>
+              <div class="contact-phone" id="phone-mom">Direct Line</div>
+            </div>
+            <div class="contact-actions">
+              <button class="btn-contact btn-wa" onclick="messageContact('Mom')">💬 WA</button>
+              <button class="btn-contact btn-call" onclick="callContact('Mom')">📞 CALL</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- VIEW 2: ALL INSTALLED MAC APPS (98 APPS) -->
+    <div class="view-page" id="view-apps">
+      <div class="view-apps-container">
+        <div class="search-bar-box">
+          <input type="text" class="search-input" id="app-search-input" placeholder="🔍 Search among 98 installed macOS applications..." oninput="filterApps(this.value)">
+          <button class="btn-top" onclick="loadAllApps()">🔄 REFRESH APPS</button>
+        </div>
+        <div class="apps-catalog-grid" id="apps-catalog">
+          <!-- Dynamically populated from /api/apps -->
+          <div style="color:var(--text-muted); font-size:13px;">Scanning installed macOS applications...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- VIEW 3: COMMUNICATIONS & CONTACTS -->
+    <div class="view-page" id="view-comms">
+      <div class="view-comms-container">
+        <!-- Left: WhatsApp & Instagram Message Composer -->
+        <div class="comms-left glass-panel">
+          <div class="panel-header">WHATSAPP AUTO-DISPATCH</div>
+          <div class="composer-box">
+            <input type="text" class="composer-input" id="wa-recipient" placeholder="Recipient Name (e.g. Dad, Mom, Aryan) or Phone Number">
+            <textarea class="composer-textarea" id="wa-message-text" placeholder="Type message to send automatically via WhatsApp..."></textarea>
+            <button class="btn-send" onclick="submitCustomWhatsApp()">
+              <span>💬 SEND WHATSAPP MESSAGE</span>
+            </button>
+          </div>
+
+          <div class="panel-header" style="margin-top:20px;">INSTAGRAM DIRECT MESSAGE</div>
+          <div class="composer-box">
+            <input type="text" class="composer-input" id="ig-username" placeholder="Instagram Username (e.g. rahul, ankit)">
+            <textarea class="composer-textarea" id="ig-message-text" placeholder="Type message for Instagram direct thread..."></textarea>
+            <button class="btn-send" style="background:#e1306c; color:#fff;" onclick="submitCustomInstagram()">
+              <span>📷 OPEN INSTAGRAM DM THREAD</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Right: Address Book & Calling -->
+        <div class="comms-right glass-panel">
+          <div class="panel-header">
+            <span>SAVED CONTACTS DIRECTORY</span>
+            <button class="btn-top" onclick="promptAddNewContact()">+ ADD CONTACT</button>
+          </div>
+          <div style="flex:1; overflow-y:auto;" id="comms-contacts-list">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- VIEW 4: STUDY & IIT PATNA PORTALS -->
+    <div class="view-page" id="view-study">
+      <div style="width:100%; display:flex; flex-direction:column; gap:16px;">
+        <!-- Portals Row -->
+        <div class="study-grid">
+          <div class="glass-panel tile-card" style="padding:20px;" onclick="window.open('https://cet.iitp.ac.in/moodle', '_blank')">
+            <div style="font-size:32px;">🎓</div>
+            <div style="font-family:var(--font-display); font-size:16px; font-weight:800; color:var(--cyan);">IIT PATNA CET MOODLE</div>
+            <div style="color:var(--text-muted); font-size:13px;">Course materials, assignment submissions & syllabus</div>
+          </div>
+
+          <div class="glass-panel tile-card" style="padding:20px;" onclick="window.open('https://outlook.office.com', '_blank')">
+            <div style="font-size:32px;">✉️</div>
+            <div style="font-family:var(--font-display); font-size:16px; font-weight:800; color:var(--cyan);">OFFICE 365 WEBMAIL</div>
+            <div style="color:var(--text-muted); font-size:13px;">Institutional email, IIT Patna announcements & notices</div>
+          </div>
+
+          <div class="glass-panel tile-card" style="padding:20px;" onclick="window.open('https://iitp.edutinker.com', '_blank')">
+            <div style="font-size:32px;">🏫</div>
+            <div style="font-family:var(--font-display); font-size:16px; font-weight:800; color:var(--cyan);">EDUTINKER PORTAL</div>
+            <div style="color:var(--text-muted); font-size:13px;">Student academic portal & attendance records</div>
+          </div>
+        </div>
+
+        <!-- Pomodoro & Custom Study Timer -->
+        <div class="glass-panel timer-display-box">
+          <div style="font-family:var(--font-display); font-size:14px; letter-spacing:2px; color:var(--cyan);">
+            CYBER SECURITY // POMODORO STUDY TIMER
+          </div>
+          <div class="timer-ring-text" id="study-timer-countdown">25:00</div>
+          <div style="color:var(--text-muted); font-size:13px;" id="study-timer-label">Pomodoro Study Session</div>
+
+          <div class="timer-controls">
+            <button class="btn-timer-preset" onclick="startStudyTimer(15, 'Quick Revision')">15 MIN (REVISION)</button>
+            <button class="btn-timer-preset" onclick="startStudyTimer(25, 'Pomodoro Session')">25 MIN (POMODORO)</button>
+            <button class="btn-timer-preset" onclick="startStudyTimer(45, 'Deep Security Lab')">45 MIN (DEEP WORK)</button>
+            <button class="btn-timer-preset" onclick="startStudyTimer(60, 'IITP Lecture')">60 MIN (LECTURE)</button>
+            <button class="btn-timer-preset" style="border-color:var(--gold); color:var(--gold);" onclick="promptCustomTimer()">⏱️ CUSTOM</button>
+            <button class="btn-timer-preset" style="border-color:var(--red); color:var(--red);" onclick="stopStudyTimer()">⏹️ STOP</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- VIEW 5: NOTES & MEMOS -->
+    <div class="view-page" id="view-notes">
+      <div class="notes-container">
+        <!-- Notes List -->
+        <div class="notes-list-col glass-panel">
+          <div class="panel-header">
+            <span>SAVED NOTES</span>
+            <button class="btn-top" onclick="createNewNoteUI()">+ NEW</button>
+          </div>
+          <div class="notes-cards-box" id="notes-cards-list">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+
+        <!-- Note Editor / Viewer -->
+        <div class="notes-editor-col glass-panel">
+          <div class="panel-header">
+            <span id="note-view-title-label">NOTE VIEWER & RECORDER</span>
+            <div style="display:flex; gap:8px;">
+              <button class="btn-top" id="btn-delete-note" style="display:none; color:var(--red); border-color:var(--red);" onclick="deleteCurrentNote()">DELETE</button>
+              <button class="btn-top" onclick="saveNoteFromUI()">💾 SAVE NOTE</button>
+            </div>
+          </div>
+          <input type="text" class="composer-input" id="note-title-input" placeholder="Note Title (e.g. Cryptography Lab Notes)">
+          <textarea class="composer-textarea" id="note-content-input" style="flex:1; height:auto;" placeholder="Write your note, study memo, or code snippet here..."></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- VIEW 6: SYSTEM & CONTROLS -->
+    <div class="view-page" id="view-system">
+      <div class="system-controls-grid">
+        <!-- Master Audio Control -->
+        <div class="control-card">
+          <div class="control-card-title">🔊 SYSTEM AUDIO OUTPUT</div>
+          <div style="display:flex; align-items:center; gap:12px; margin-top:10px;">
+            <span style="font-size:20px; cursor:pointer;" onclick="triggerAction('toggle_mute')">🔈</span>
+            <input type="range" id="sys-vol-slider" min="0" max="100" value="80" style="flex:1;" onchange="setVolume(this.value)">
+            <span class="metric-val" id="sys-vol-val">80%</span>
+          </div>
+          <div style="display:flex; gap:8px; margin-top:8px;">
+            <button class="btn-top" style="flex:1;" onclick="setVolume(30)">30% LOW</button>
+            <button class="btn-top" style="flex:1;" onclick="setVolume(80)">80% MID</button>
+            <button class="btn-top" style="flex:1;" onclick="setVolume(100)">100% MAX</button>
+          </div>
+        </div>
+
+        <!-- Display & Screen Actions -->
+        <div class="control-card">
+          <div class="control-card-title">🖥️ DISPLAY & SECURITY</div>
+          <button class="btn-send" style="background:rgba(0, 240, 255, 0.1); border:1px solid var(--cyan); color:var(--cyan);" onclick="triggerAction('screenshot')">
+            📸 TAKE FULL SCREENSHOT
+          </button>
+          <button class="btn-send" style="background:rgba(255, 183, 0, 0.1); border:1px solid var(--gold); color:var(--gold);" onclick="triggerAction('lock')">
+            🔒 LOCK MAC DISPLAY
+          </button>
+        </div>
+
+        <!-- AI Persona & Voice -->
+        <div class="control-card">
+          <div class="control-card-title">🎭 ASSISTANT PERSONA</div>
+          <div style="display:flex; gap:10px;">
+            <button class="btn-top" style="flex:1; padding:10px;" onclick="setPersona('jarvis')">J.A.R.V.I.S. (DANIEL)</button>
+            <button class="btn-top" style="flex:1; padding:10px;" onclick="setPersona('friday')">F.R.I.D.A.Y. (MOIRA)</button>
+          </div>
+          <div style="font-size:11px; color:var(--text-muted); margin-top:8px;">
+            Daniel: British butler elegance & sharp intellect.<br>
+            Moira: Irish tactical clarity & loyalty.
+          </div>
+        </div>
+
+        <!-- Browser Search Hub -->
+        <div class="control-card" style="grid-column: span 2;">
+          <div class="control-card-title">🌐 DIRECT BROWSER SEARCH HUB</div>
+          <div style="display:flex; gap:8px;">
+            <input type="text" class="composer-input" id="search-hub-query" placeholder="Enter search query..." style="flex:1;">
+            <button class="btn-top" onclick="executeHubSearch('chrome')">GOOGLE</button>
+            <button class="btn-top" onclick="executeHubSearch('youtube')">YOUTUBE</button>
+            <button class="btn-top" onclick="executeHubSearch('github')">GITHUB</button>
+            <button class="btn-top" onclick="executeHubSearch('reddit')">REDDIT</button>
+          </div>
+        </div>
+
+        <!-- Autonomous Telemetry Diagnostics -->
+        <div class="control-card">
+          <div class="control-card-title">⚡ HARDWARE TELEMETRY SCAN</div>
+          <button class="btn-send" onclick="executeCommand('system status')">
+            RUN FULL TELEMETRY
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- VIEW 7: BACKEND ENGINE & INTEGRATED TERMINAL -->
+    <div class="view-page" id="view-backend">
+      <div style="width:100%; height:100%; display:flex; flex-direction:column; gap:14px;">
+        <!-- Top Status & Quick Action Bar -->
+        <div class="glass-panel" style="flex-direction:row; justify-content:space-between; align-items:center; padding:12px 18px;">
+          <div style="display:flex; align-items:center; gap:16px;">
+            <div style="font-family:var(--font-display); font-size:13px; font-weight:800; color:var(--cyan); letter-spacing:1px;">
+              BACKEND ENGINE SUPERVISOR
+            </div>
+            <div id="backend-engine-pill" class="status-pill status-online">● RUNNING</div>
+            <div style="font-family:var(--font-mono); font-size:11px; color:var(--text-muted);" id="backend-pid-label">PID: --</div>
+            <div style="font-family:var(--font-mono); font-size:11px; color:var(--text-muted);" id="backend-model-label">MODEL: LM Studio (NEMOTRON)</div>
+          </div>
+          <div style="display:flex; gap:10px;">
+            <button class="btn-top" onclick="fetchBackendLogs()">🔄 REFRESH LOGS</button>
+            <button class="btn-top" style="color:var(--gold); border-color:var(--gold);" onclick="restartBackendAPI()">⚡ RESTART BACKEND</button>
+            <button class="btn-top" style="color:var(--red); border-color:var(--red);" onclick="shutdownBackendAPI()">⏹️ POWER DOWN</button>
+          </div>
+        </div>
+
+        <!-- Two Columns: Live Stream Logs & Live macOS Terminal Runner -->
+        <div style="flex:1; display:flex; gap:16px; min-height:0;">
+          <!-- Left: Live Log Feed -->
+          <div class="glass-panel" style="flex:1; display:flex; flex-direction:column;">
+            <div class="panel-header">
+              <span>LIVE SERVER & REASONING STREAM</span>
+              <span style="font-size:10px; color:var(--text-muted);">REAL-TIME</span>
+            </div>
+            <div class="feed-container" id="backend-logs-container" style="flex:1; background:rgba(0,0,0,0.65); font-family:var(--font-mono); font-size:11px; white-space:pre-wrap;">
+              Connecting to live log stream...
+            </div>
+          </div>
+
+          <!-- Right: Interactive Terminal Runner -->
+          <div class="glass-panel" style="flex:1; display:flex; flex-direction:column;">
+            <div class="panel-header">
+              <span>INTEGRATED MAC TERMINAL (BASH)</span>
+              <span style="font-size:10px; color:var(--cyan);">ZERO CONSOLE NEEDED</span>
+            </div>
+            <div style="display:flex; gap:8px; margin-bottom:10px;">
+              <input type="text" class="composer-input" id="terminal-cmd-input" placeholder="Type macOS command (e.g. 'lms ps', 'lms server status', 'pmset -g batt', 'top cpu')..." style="flex:1; font-family:var(--font-mono); font-size:12px;">
+              <button class="btn-top" style="padding:0 16px;" onclick="runTerminalCommand()">RUN</button>
+            </div>
+            <div style="display:flex; gap:6px; margin-bottom:10px; flex-wrap:wrap;">
+              <span class="sug-pill" onclick="quickTerminal('lms ps')">lms ps</span>
+              <span class="sug-pill" onclick="quickTerminal('lms server status')">lms status</span>
+              <span class="sug-pill" onclick="quickTerminal('uptime')">uptime</span>
+              <span class="sug-pill" onclick="quickTerminal('pmset -g batt')">battery</span>
+              <span class="sug-pill" onclick="quickTerminal('top -l 1 | head -n 12')">top cpu</span>
+              <span class="sug-pill" onclick="quickTerminal('ls -lh ~/Documents/JarvisNotes')">list notes</span>
+            </div>
+            <div id="terminal-output-box" style="flex:1; background:#000; border:1px solid rgba(0,240,255,0.2); border-radius:4px; padding:12px; font-family:var(--font-mono); font-size:11px; color:#43d692; overflow-y:auto; white-space:pre-wrap;">
+$ J.A.R.V.I.S. Terminal ready. Type command above and click RUN.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Bottom Universal Console -->
+  <footer>
+    <div class="command-suggestions">
+      <span style="font-size:10px; color:var(--cyan); font-family:var(--font-display);">QUICK:</span>
+      <div class="sug-pill" onclick="executeCommand('search manga on chrome')">Search Manga</div>
+      <div class="sug-pill" onclick="executeCommand('system status')">Diagnostics</div>
+      <div class="sug-pill" onclick="executeCommand('open moodle')">IITP Moodle</div>
+      <div class="sug-pill" onclick="executeCommand('open webmail')">Webmail</div>
+      <div class="sug-pill" onclick="executeCommand('open whatsapp')">WhatsApp</div>
+      <div class="sug-pill" onclick="executeCommand('play lofi beats on youtube')">Lofi Beats</div>
+      <div class="sug-pill" onclick="executeCommand('open vs code')">VS Code</div>
+      <div class="sug-pill" onclick="executeCommand('new tab')">New Tab</div>
+    </div>
+
+    <div class="command-bar">
+      <button class="mic-button" id="mic-btn" onclick="toggleWebMic()" title="Push to Speak">🎙️</button>
+      <input type="text" class="command-input" id="cmd-input" placeholder="Speak or type any command (e.g. 'search manga on chrome', 'open moodle', 'call Dad', 'take a note')...">
+      <button class="btn-execute" onclick="submitTextInput()">EXECUTE</button>
+    </div>
+  </footer>
+
+  <script>
+    const SERVER_URL = window.location.origin.includes('http') ? window.location.origin : 'http://127.0.0.1:8765';
+    let currentPersona = "JARVIS";
+    let isBackendOnline = false;
+    let lastSeenMsgId = null;
+    let installedAppsCache = [];
+    let currentOpenNoteFile = null;
+
+    // Clock
+    function updateClock() {
+      const now = new Date();
+      document.getElementById('hud-clock').textContent = now.toLocaleTimeString();
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // Fullscreen Toggle
+    function toggleFullScreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      } else if (document.exitFullscreen) {
+        document.exitFullscreen().catch(() => {});
+      }
+    }
+    document.addEventListener('keydown', (e) => {
+      if (e.key.toLowerCase() === 'f' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') toggleFullScreen();
+    });
+
+    // View Navigation Switcher
+    function switchView(viewId) {
+      document.querySelectorAll('.view-page').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+
+      const target = document.getElementById(viewId);
+      if (target) target.classList.add('active');
+
+      const tabs = Array.from(document.querySelectorAll('.nav-tab'));
+      const map = {
+        'view-overview': 0,
+        'view-apps': 1,
+        'view-comms': 2,
+        'view-study': 3,
+        'view-notes': 4,
+        'view-system': 5,
+        'view-backend': 6
+      };
+      if (map[viewId] !== undefined && tabs[map[viewId]]) {
+        tabs[map[viewId]].classList.add('active');
+      }
+
+      if (viewId === 'view-apps' && installedAppsCache.length === 0) {
+        loadAllApps();
+      } else if (viewId === 'view-notes') {
+        loadAllNotes();
+      } else if (viewId === 'view-backend') {
+        fetchBackendLogs();
+      }
+    }
+
+    // Arc Reactor Animation
+    const canvas = document.getElementById('reactor-canvas');
+    const ctx = canvas.getContext('2d');
+    let angleOuter = 0, angleMiddle = 0, angleInner = 0;
+    let currentStatus = "SYSTEM ONLINE";
+    let isSpeaking = false, isListening = false;
+
+    // Audio Visualizer Bars
+    const visContainer = document.getElementById('vis-container');
+    const BAR_COUNT = 32;
+    const bars = [];
+    for (let i = 0; i < BAR_COUNT; i++) {
+      const b = document.createElement('div');
+      b.className = 'vis-bar';
+      visContainer.appendChild(b);
+      bars.push(b);
+    }
+
+    function drawArcReactor() {
+      const cx = canvas.width / 2;
+      const cy = canvas.height / 2;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      const colorMain = (isSpeaking || currentStatus === "THINKING") ? '#ffb700' : '#00f0ff';
+      const colorGlow = (isSpeaking || currentStatus === "THINKING") ? 'rgba(255, 183, 0, 0.45)' : 'rgba(0, 240, 255, 0.35)';
+
+      // Outer Compass Ring
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(angleOuter);
+      ctx.strokeStyle = 'rgba(0, 240, 255, 0.2)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(0, 0, 140, 0, Math.PI * 2);
+      ctx.stroke();
+
+      for (let i = 0; i < 36; i++) {
+        const rad = (i * 10 * Math.PI) / 180;
+        const len = (i % 3 === 0) ? 10 : 5;
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(rad) * 136, Math.sin(rad) * 136);
+        ctx.lineTo(Math.cos(rad) * (136 - len), Math.sin(rad) * (136 - len));
+        ctx.strokeStyle = (i % 3 === 0) ? colorMain : 'rgba(0, 240, 255, 0.3)';
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      // Middle Segmented Ring
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(-angleMiddle);
+      ctx.strokeStyle = colorMain;
+      ctx.lineWidth = 3;
+      ctx.shadowBlur = 10;
+      ctx.shadowColor = colorMain;
+
+      for (let i = 0; i < 4; i++) {
+        ctx.beginPath();
+        ctx.arc(0, 0, 110, (i * Math.PI / 2) + 0.15, (i * Math.PI / 2) + Math.PI / 2 - 0.15);
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      // Inner Dashed Ring
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(angleInner);
+      ctx.strokeStyle = 'rgba(0, 240, 255, 0.6)';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([6, 8]);
+      ctx.beginPath();
+      ctx.arc(0, 0, 80, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+
+      // Core Hexagon
+      ctx.save();
+      ctx.translate(cx, cy);
+      const pulse = Math.sin(Date.now() / 250) * 6;
+      const r = 45 + pulse;
+      const grad = ctx.createRadialGradient(0, 0, 5, 0, 0, r + 20);
+      grad.addColorStop(0, colorMain);
+      grad.addColorStop(0.5, colorGlow);
+      grad.addColorStop(1, 'transparent');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(0, 0, r + 20, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      for (let i = 0; i < 6; i++) {
+        const rad = (i * 60 * Math.PI) / 180 + angleInner * 0.5;
+        const x = Math.cos(rad) * 28;
+        const y = Math.sin(rad) * 28;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+      ctx.stroke();
+      ctx.restore();
+
+      const speed = (currentStatus === "THINKING") ? 0.03 : 0.008;
+      angleOuter += speed * 0.5;
+      angleMiddle += speed * 0.8;
+      angleInner += speed * 1.2;
+
+      bars.forEach((bar, idx) => {
+        let height = 6;
+        if (isSpeaking) {
+          height = 8 + Math.random() * 22;
+        } else if (isListening) {
+          height = 6 + Math.sin(Date.now() / 150 + idx * 0.3) * 10;
+        }
+        bar.style.height = `${Math.max(4, height)}px`;
+        bar.style.background = isSpeaking ? 'var(--gold)' : 'var(--cyan)';
+        bar.style.boxShadow = isSpeaking ? '0 0 8px var(--gold)' : '0 0 6px var(--cyan)';
+      });
+
+      requestAnimationFrame(drawArcReactor);
+    }
+    requestAnimationFrame(drawArcReactor);
+
+    // Feed Logging
+    function addFeedItem(sender, text, type="agent") {
+      const feed = document.getElementById('feed-box');
+      if (!feed) return;
+      const item = document.createElement('div');
+      item.className = `feed-msg feed-${type}`;
+      item.textContent = `[${sender}] ${text}`;
+      feed.appendChild(item);
+      feed.scrollTop = feed.scrollHeight;
+    }
+
+    function clearFeed() {
+      const feed = document.getElementById('feed-box');
+      if (feed) feed.innerHTML = '';
+      addFeedItem('SYSTEM', 'Feed cleared.', 'system');
+    }
+
+    // Backend Status Pill
+    function setBackendIndicator(online) {
+      isBackendOnline = online;
+      const pill = document.getElementById('backend-status-pill');
+      if (!pill) return;
+      if (online) {
+        pill.className = 'status-pill status-online';
+        pill.textContent = '● BACKEND CONNECTED';
+      } else {
+        pill.className = 'status-pill status-offline';
+        pill.textContent = '● BACKEND OFFLINE (START ./run.sh)';
+      }
+    }
+
+    // Command Execution with Fallback
+    async function executeCommand(cmdText, source="typed") {
+      if (!cmdText) return;
+      setStatus('THINKING');
+
+      let backendOk = false;
+      try {
+        const res = await fetch(`${SERVER_URL}/api/command`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({command: cmdText, source: source})
+        });
+        if (res.ok) {
+          backendOk = true;
+          setBackendIndicator(true);
+          const data = await res.json();
+          if (data.status === "ignored") {
+            // Filtered ambient room speech: user was speaking to friends or family
+            setStatus('STANDBY');
+            return;
+          }
+          addFeedItem('DEEPAK', cmdText, 'user');
+          if (data.reply) {
+            addFeedItem(currentPersona, data.reply, 'agent');
+          }
+          setStatus('STANDBY');
+          return;
+        }
+      } catch (err) {
+        console.warn('Backend unavailable for command:', err);
+      }
+
+      if (!backendOk) {
+        addFeedItem('DEEPAK', cmdText, 'user');
+        setBackendIndicator(false);
+        runBrowserFallback(cmdText);
+      }
+    }
+
+    function runBrowserFallback(query) {
+      const q = query.toLowerCase().trim();
+      let speech = "";
+
+      if (q.includes('manga')) {
+        window.open('https://www.google.com/search?q=manga', '_blank');
+        speech = "Searching for manga on Google, Sir.";
+      } else if (q.includes('lofi') || q.includes('youtube')) {
+        window.open('https://www.youtube.com/results?search_query=lofi+hip+hop+radio', '_blank');
+        speech = "Playing lofi beats on YouTube, Sir.";
+      } else if (q.includes('moodle') || q.includes('iitp')) {
+        window.open('https://cet.iitp.ac.in/moodle', '_blank');
+        speech = "Launching IIT Patna CET Moodle portal, Sir.";
+      } else if (q.includes('webmail') || q.includes('outlook')) {
+        window.open('https://outlook.office.com', '_blank');
+        speech = "Opening Outlook 365 webmail, Sir.";
+      } else if (q.includes('instagram') || q.includes('ig')) {
+        window.open('https://www.instagram.com/direct/inbox/', '_blank');
+        speech = "Opening Instagram Direct Inbox, Sir.";
+      } else if (q.includes('chrome')) {
+        window.open('https://www.google.com', '_blank');
+        speech = "Opening Google Chrome, Sir.";
+      } else if (q.includes('whatsapp')) {
+        window.open('https://web.whatsapp.com', '_blank');
+        speech = "Opening WhatsApp Web, Sir.";
+      } else if (q.includes('spotify')) {
+        window.open('https://open.spotify.com', '_blank');
+        speech = "Opening Spotify, Sir.";
+      } else if (q.includes('status') || q.includes('diagnostic')) {
+        speech = "Running client telemetry, Sir. CPU and RAM telemetry is connected. To run full hardware scan, start Jarvis from your Desktop.";
+      } else if (q.startsWith('set a timer') || q.includes('timer')) {
+        const m = q.match(/(\d+(?:\.\d+)?)\s*min/);
+        const mins = m ? parseFloat(m[1]) : 15;
+        startStudyTimer(mins, 'Study Session');
+        speech = `Countdown timer set for ${mins} minutes, Sir.`;
+      } else {
+        const cleanQ = q.replace(/^search\s+/, '').replace(/\s+on\s+chrome$/, '');
+        window.open(`https://www.google.com/search?q=${encodeURIComponent(cleanQ)}`, '_blank');
+        speech = `Searching for ${cleanQ}, Sir.`;
+      }
+
+      addFeedItem(currentPersona, speech, 'agent');
+      setStatus('STANDBY');
+      if (!isBackendOnline && 'speechSynthesis' in window) {
+        try {
+          const u = new SpeechSynthesisUtterance(speech);
+          u.rate = 1.05;
+          window.speechSynthesis.speak(u);
+        } catch(e) {}
+      }
+    }
+
+    function submitTextInput() {
+      const input = document.getElementById('cmd-input');
+      const text = input.value.trim();
+      if (text) {
+        executeCommand(text);
+        input.value = '';
+      }
+    }
+
+    document.getElementById('cmd-input').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') submitTextInput();
+    });
+
+    // Direct Action Trigger
+    async function triggerAction(actionName, extra={}) {
+      let backendOk = false;
+      try {
+        const res = await fetch(`${SERVER_URL}/api/action`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({action: actionName, ...extra})
+        });
+        if (res.ok) {
+          backendOk = true;
+          setBackendIndicator(true);
+          const data = await res.json();
+          addFeedItem('ACTION', data.reply || `Executed ${actionName.toUpperCase()}`, 'system');
+        }
+      } catch (err) {
+        console.warn('Action failed:', err);
+      }
+
+      if (!backendOk) {
+        setBackendIndicator(false);
+        addFeedItem('SYSTEM', `Action ${actionName.toUpperCase()} requires backend agent. Please launch Jarvis on Desktop.`, 'system');
+      }
+    }
+
+    function setVolume(val) {
+      document.getElementById('sys-vol-val').textContent = val + '%';
+      const s = document.getElementById('sys-vol-slider');
+      if (s) s.value = val;
+      triggerAction('volume', {level: parseInt(val)});
+    }
+
+    function setPersona(persona) {
+      currentPersona = persona.toUpperCase();
+      document.getElementById('persona-toggle-btn').textContent = currentPersona;
+      triggerAction('switch_persona', {persona: persona.toLowerCase()});
+    }
+
+    function togglePersona() {
+      const next = (currentPersona === "JARVIS") ? "friday" : "jarvis";
+      setPersona(next);
+    }
+
+    function setStatus(status) {
+      currentStatus = status;
+      document.getElementById('status-text').textContent = status;
+      isListening = (status === "LISTENING");
+      isSpeaking = (status === "SPEAKING");
+
+      const badge = document.getElementById('status-badge');
+      const dot = document.getElementById('status-dot');
+      if (status === "SPEAKING" || status === "THINKING") {
+        badge.style.color = "var(--gold)";
+        badge.style.borderColor = "var(--gold)";
+        dot.style.background = "var(--gold)";
+      } else {
+        badge.style.color = "var(--cyan)";
+        badge.style.borderColor = "var(--cyan)";
+        dot.style.background = "var(--cyan)";
+      }
+    }
+
+    // Installed macOS Apps Management (View 2)
+    async function loadAllApps() {
+      const container = document.getElementById('apps-catalog');
+      container.innerHTML = '<div style="color:var(--text-muted); font-size:13px;">Loading apps catalog...</div>';
+      try {
+        const res = await fetch(`${SERVER_URL}/api/apps`);
+        if (res.ok) {
+          const data = await res.json();
+          installedAppsCache = data.apps || [];
+          renderApps(installedAppsCache);
+        } else {
+          renderFallbackApps();
+        }
+      } catch (e) {
+        renderFallbackApps();
+      }
+    }
+
+    function renderApps(apps) {
+      const container = document.getElementById('apps-catalog');
+      container.innerHTML = '';
+      if (!apps || apps.length === 0) {
+        container.innerHTML = '<div style="color:var(--text-muted);">No applications found matching search.</div>';
+        return;
+      }
+      apps.forEach(app => {
+        const card = document.createElement('div');
+        card.className = 'app-card';
+        card.onclick = () => launchAppDirect(app.name);
+        card.innerHTML = `
+          <div class="app-card-title">${app.name}</div>
+          <div class="app-card-btn">LAUNCH ➔</div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    function filterApps(query) {
+      const q = query.toLowerCase().trim();
+      if (!q) {
+        renderApps(installedAppsCache);
+        return;
+      }
+      const filtered = installedAppsCache.filter(a => a.name.toLowerCase().includes(q));
+      renderApps(filtered);
+    }
+
+    function renderFallbackApps() {
+      const standard = [
+        "Google Chrome", "Visual Studio Code", "WhatsApp", "eduTinker",
+        "ChatGPT", "Claude", "Telegram", "Slack", "Activity Monitor",
+        "Terminal", "Calculator", "Notes", "Spotify", "Safari", "Steam", "Prime Video"
+      ].map(n => ({name: n}));
+      installedAppsCache = standard;
+      renderApps(standard);
+    }
+
+    async function launchAppDirect(appName) {
+      addFeedItem('DEEPAK', `Launch ${appName}`, 'user');
+      try {
+        const res = await fetch(`${SERVER_URL}/api/apps/launch`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({app_name: appName})
+        });
+        if (res.ok) {
+          const data = await res.json();
+          addFeedItem(currentPersona, data.message || `Launched ${appName}`, 'agent');
+          return;
+        }
+      } catch(e) {}
+      executeCommand(`open ${appName}`);
+    }
+
+    // Communications (View 3)
+    function submitCustomWhatsApp() {
+      const rec = document.getElementById('wa-recipient').value.trim();
+      const msg = document.getElementById('wa-message-text').value.trim();
+      if (!rec || !msg) {
+        alert("Please provide both recipient and message text.");
+        return;
+      }
+      if (isBackendOnline) {
+        executeCommand(`send a message on WhatsApp to ${rec} saying ${msg}`);
+      } else {
+        const clean = rec.replace(/[^\d]/g, '');
+        const target = (clean.length === 10) ? '91' + clean : clean;
+        window.open(`https://wa.me/${target}?text=${encodeURIComponent(msg)}`, '_blank');
+        addFeedItem(currentPersona, `Opening WhatsApp for ${rec}, Sir.`, 'agent');
+      }
+      document.getElementById('wa-message-text').value = '';
+    }
+
+    function submitCustomInstagram() {
+      const user = document.getElementById('ig-username').value.trim();
+      const msg = document.getElementById('ig-message-text').value.trim();
+      if (!user) {
+        window.open('https://www.instagram.com/direct/inbox/', '_blank');
+        return;
+      }
+      executeCommand(`dm ${user} on instagram saying ${msg}`);
+      window.open(`https://www.instagram.com/direct/t/${user}/`, '_blank');
+    }
+
+    function messageContact(contactName) {
+      let phoneEl = (contactName.toLowerCase() === 'dad') ? document.getElementById('phone-dad') : document.getElementById('phone-mom');
+      let phone = phoneEl ? phoneEl.textContent.trim() : '';
+      if (phone === 'Not set' || !phone || phone === 'Direct Line') {
+        phone = prompt(`Enter phone number for ${contactName} (with country code, e.g. +919812345678):`);
+        if (!phone) return;
+        saveContactAPI(contactName, phone);
+      }
+      const msg = prompt(`Enter WhatsApp message for ${contactName}:`);
+      if (!msg) return;
+      if (isBackendOnline) {
+        executeCommand(`send a message on WhatsApp to ${contactName} saying ${msg}`);
+      } else {
+        const clean = phone.replace(/[^\d]/g, '');
+        const target = (clean.length === 10) ? '91' + clean : clean;
+        window.open(`https://wa.me/${target}?text=${encodeURIComponent(msg)}`, '_blank');
+        addFeedItem(currentPersona, `Opening WhatsApp for ${contactName}, Sir.`, 'agent');
+      }
+    }
+
+    function callContact(contactName) {
+      let phoneEl = (contactName.toLowerCase() === 'dad') ? document.getElementById('phone-dad') : document.getElementById('phone-mom');
+      let phone = phoneEl ? phoneEl.textContent.trim() : '';
+      if (phone === 'Not set' || !phone || phone === 'Direct Line') {
+        phone = prompt(`Enter phone number for ${contactName} (with country code, e.g. +919812345678):`);
+        if (!phone) return;
+        saveContactAPI(contactName, phone);
+      }
+      if (isBackendOnline) {
+        executeCommand(`call ${contactName} on WhatsApp`);
+      } else {
+        const clean = phone.replace(/[^\d+]/g, '');
+        window.location.href = `tel:${clean}`;
+        addFeedItem(currentPersona, `Calling ${contactName}, Sir.`, 'agent');
+      }
+    }
+
+    async function promptAddNewContact() {
+      const name = prompt("Contact Name (e.g. Dad, Aryan):");
+      if (!name) return;
+      const phone = prompt(`Phone number for ${name} (with country code, e.g. +919812345678):`);
+      if (!phone) return;
+      await saveContactAPI(name, phone);
+    }
+
+    async function saveContactAPI(name, phone) {
+      try {
+        const res = await fetch(`${SERVER_URL}/api/contacts`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({name, phone})
+        });
+        if (res.ok) {
+          addFeedItem('SYSTEM', `Contact ${name} saved successfully.`, 'system');
+          loadContactsDirectory();
+        }
+      } catch(e) {
+        executeCommand(`save contact ${name}: ${phone}`);
+      }
+    }
+
+    async function loadContactsDirectory() {
+      const list = document.getElementById('comms-contacts-list');
+      if (!list) return;
+      try {
+        const res = await fetch(`${SERVER_URL}/api/contacts`);
+        if (res.ok) {
+          const data = await res.json();
+          renderContactsList(data.contacts || {});
+        }
+      } catch(e) {}
+    }
+
+    function renderContactsList(contacts) {
+      const list = document.getElementById('comms-contacts-list');
+      if (!list) return;
+      list.innerHTML = '';
+      const keys = Object.keys(contacts);
+      if (keys.length === 0) {
+        list.innerHTML = '<div style="color:var(--text-muted);">No contacts saved yet. Click + ADD CONTACT.</div>';
+        return;
+      }
+      keys.forEach(k => {
+        const val = contacts[k];
+        const row = document.createElement('div');
+        row.className = 'contact-row';
+        row.innerHTML = `
+          <div class="contact-info">
+            <div class="contact-name">${k.toUpperCase()}</div>
+            <div class="contact-phone">${val || 'Number not set'}</div>
+          </div>
+          <div class="contact-actions">
+            <button class="btn-contact btn-wa" onclick="messageContact('${k}')">💬 WA</button>
+            <button class="btn-contact btn-call" onclick="callContact('${k}')">📞 CALL</button>
+            <button class="btn-contact" style="border-color:var(--red); color:var(--red);" onclick="deleteContactAPI('${k}')">✕</button>
+          </div>
+        `;
+        list.appendChild(row);
+      });
+    }
+
+    async function deleteContactAPI(name) {
+      if (!confirm(`Delete contact ${name}?`)) return;
+      try {
+        await fetch(`${SERVER_URL}/api/contacts/delete`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({name})
+        });
+        loadContactsDirectory();
+      } catch(e) {}
+    }
+
+    // Study & Timer (View 4)
+    let studyTimerInterval = null;
+    let timerTotalSeconds = 0;
+    let timerRemainingSeconds = 0;
+
+    function startStudyTimer(minutes, label="Study Session") {
+      document.getElementById('study-timer-label').textContent = label;
+      timerTotalSeconds = Math.round(minutes * 60);
+      timerRemainingSeconds = timerTotalSeconds;
+      updateTimerDisplay();
+
+      if (studyTimerInterval) clearInterval(studyTimerInterval);
+      studyTimerInterval = setInterval(() => {
+        timerRemainingSeconds--;
+        updateTimerDisplay();
+        if (timerRemainingSeconds <= 0) {
+          clearInterval(studyTimerInterval);
+          addFeedItem(currentPersona, `Study session completed! Great job on ${label}, Sir.`, 'agent');
+          if (!isBackendOnline && 'speechSynthesis' in window) {
+            window.speechSynthesis.speak(new SpeechSynthesisUtterance(`Time is up, Sir. Your ${label} is complete.`));
+          }
+        }
+      }, 1000);
+
+      // Also trigger backend timer
+      try {
+        fetch(`${SERVER_URL}/api/timer/start`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({minutes, label})
+        });
+      } catch(e) {}
+    }
+
+    function updateTimerDisplay() {
+      const m = Math.floor(timerRemainingSeconds / 60);
+      const s = timerRemainingSeconds % 60;
+      document.getElementById('study-timer-countdown').textContent =
+        `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    }
+
+    function promptCustomTimer() {
+      const min = prompt("Enter timer duration in minutes:");
+      if (!min) return;
+      const num = parseFloat(min);
+      if (num > 0) startStudyTimer(num, "Custom Study Session");
+    }
+
+    function stopStudyTimer() {
+      if (studyTimerInterval) clearInterval(studyTimerInterval);
+      timerRemainingSeconds = 0;
+      updateTimerDisplay();
+      document.getElementById('study-timer-label').textContent = "Timer Inactive";
+      try {
+        fetch(`${SERVER_URL}/api/timer/cancel`, {method: 'POST'});
+      } catch(e) {}
+    }
+
+    // Notes & Memos (View 5)
+    async function loadAllNotes() {
+      const list = document.getElementById('notes-cards-list');
+      list.innerHTML = '<div style="color:var(--text-muted); font-size:12px;">Loading saved notes...</div>';
+      try {
+        const res = await fetch(`${SERVER_URL}/api/notes`);
+        if (res.ok) {
+          const data = await res.json();
+          renderNotesList(data.notes || []);
+        }
+      } catch(e) {
+        list.innerHTML = '<div style="color:var(--text-muted);">Notes available when backend is online.</div>';
+      }
+    }
+
+    function renderNotesList(notes) {
+      const list = document.getElementById('notes-cards-list');
+      list.innerHTML = '';
+      if (!notes || notes.length === 0) {
+        list.innerHTML = '<div style="color:var(--text-muted); font-size:12px;">No notes recorded yet. Click + NEW to add one.</div>';
+        return;
+      }
+      notes.forEach(n => {
+        const card = document.createElement('div');
+        card.className = 'note-card';
+        card.onclick = () => openNoteInEditor(n);
+        card.innerHTML = `
+          <div class="note-card-title">${n.title}</div>
+          <div class="note-card-date">${n.date || 'Recent'}</div>
+          <div class="note-card-snippet">${n.content ? n.content.slice(0, 70) : ''}</div>
+        `;
+        list.appendChild(card);
+      });
+    }
+
+    function createNewNoteUI() {
+      currentOpenNoteFile = null;
+      document.getElementById('note-title-input').value = '';
+      document.getElementById('note-content-input').value = '';
+      document.getElementById('note-view-title-label').textContent = "NEW NOTE RECORDER";
+      document.getElementById('btn-delete-note').style.display = 'none';
+      document.getElementById('note-title-input').focus();
+    }
+
+    function openNoteInEditor(note) {
+      currentOpenNoteFile = note.filename;
+      document.getElementById('note-title-input').value = note.title;
+      document.getElementById('note-content-input').value = note.content;
+      document.getElementById('note-view-title-label').textContent = `VIEWING: ${note.title.toUpperCase()}`;
+      document.getElementById('btn-delete-note').style.display = 'block';
+    }
+
+    async function saveNoteFromUI() {
+      const title = document.getElementById('note-title-input').value.trim();
+      const content = document.getElementById('note-content-input').value.trim();
+      if (!title || !content) {
+        alert("Please enter both note title and content.");
+        return;
+      }
+      try {
+        const res = await fetch(`${SERVER_URL}/api/notes`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({title, content})
+        });
+        if (res.ok) {
+          addFeedItem('SYSTEM', `Note "${title}" saved to Documents/JarvisNotes.`, 'system');
+          loadAllNotes();
+        }
+      } catch(e) {
+        executeCommand(`take a note ${title}: ${content}`);
+      }
+    }
+
+    async function deleteCurrentNote() {
+      if (!currentOpenNoteFile) return;
+      if (!confirm("Are you sure you want to delete this note?")) return;
+      try {
+        await fetch(`${SERVER_URL}/api/notes/delete`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({filename: currentOpenNoteFile})
+        });
+        createNewNoteUI();
+        loadAllNotes();
+      } catch(e) {}
+    }
+
+    // Direct Web Search Hub
+    function executeHubSearch(platform) {
+      const query = document.getElementById('search-hub-query').value.trim();
+      if (!query) return;
+      if (platform === 'chrome') {
+        window.open(`https://www.google.com/search?q=${encodeURIComponent(query)}`, '_blank');
+      } else if (platform === 'youtube') {
+        window.open(`https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`, '_blank');
+      } else if (platform === 'github') {
+        window.open(`https://github.com/search?q=${encodeURIComponent(query)}`, '_blank');
+      } else if (platform === 'reddit') {
+        window.open(`https://www.reddit.com/search/?q=${encodeURIComponent(query)}`, '_blank');
+      }
+      addFeedItem('DEEPAK', `Search ${query} on ${platform.toUpperCase()}`, 'user');
+    }
+
+    // State Polling from Backend
+    async function pollAgentState() {
+      try {
+        const res = await fetch(`${SERVER_URL}/api/state?t=` + Date.now());
+        if (res.ok) {
+          setBackendIndicator(true);
+          const data = await res.json();
+          if (data.cpu !== undefined) {
+            document.getElementById('cpu-val').textContent = data.cpu + '%';
+            document.getElementById('cpu-bar').style.width = data.cpu + '%';
+          }
+          if (data.ram !== undefined) {
+            document.getElementById('ram-val').textContent = data.ram + '%';
+            document.getElementById('ram-bar').style.width = data.ram + '%';
+          }
+          if (data.ram_details) {
+            document.getElementById('ram-details').textContent = data.ram_details;
+          }
+          if (data.battery !== undefined) {
+            document.getElementById('battery-val').textContent = data.battery;
+            const pct = parseInt(data.battery) || 80;
+            document.getElementById('battery-bar').style.width = pct + '%';
+          }
+          if (data.power) {
+            document.getElementById('power-source').textContent = 'Power: ' + data.power;
+          }
+          if (data.chip) {
+            document.getElementById('chip-tag').textContent = data.chip.toUpperCase();
+          }
+          if (data.status) {
+            setStatus(data.status);
+          }
+          if (data.new_message && data.new_message.id !== lastSeenMsgId) {
+            lastSeenMsgId = data.new_message.id;
+            addFeedItem(data.new_message.sender, data.new_message.text, data.new_message.type);
+          }
+          if (data.contacts) {
+            if (data.contacts.dad) document.getElementById('phone-dad').textContent = data.contacts.dad;
+            if (data.contacts.mom) document.getElementById('phone-mom').textContent = data.contacts.mom;
+          }
+        } else {
+          setBackendIndicator(false);
+        }
+      } catch (err) {
+        setBackendIndicator(false);
+      }
+    }
+    setInterval(pollAgentState, 1000);
+
+    // Web Speech API for Browser-Side Push-to-Talk Mic
+    // =========================================================================
+    // Hands-Free Continuous "Hey Jarvis" Wake Word Detection (Siri-Mode)
+    // =========================================================================
+    let webRecognizer = null;
+    let continuousWakeActive = true;
+    let awaitingFollowupCommand = false;
+    let followupTimeout = null;
+
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      webRecognizer = new SpeechRecognition();
+      webRecognizer.continuous = true;
+      webRecognizer.interimResults = false;
+      webRecognizer.lang = 'en-US';
+
+      webRecognizer.onstart = () => {
+        updateWakePillUI(true);
+        document.getElementById('mic-btn').classList.add('active');
+      };
+
+      webRecognizer.onresult = (event) => {
+        const lastIdx = event.results.length - 1;
+        if (lastIdx < 0) return;
+        const transcript = event.results[lastIdx][0].transcript.trim();
+        if (!transcript) return;
+
+        console.log('[Heard Speech]:', transcript);
+        const lower = transcript.toLowerCase();
+
+        // Check for wake words
+        const wakePattern = /\b(hey jarvis|jarvis|hey friday|friday|ok jarvis|ok friday)\b/i;
+        const hasWake = wakePattern.test(lower);
+
+        if (hasWake) {
+          const withoutWake = lower.replace(/\b(hey jarvis|jarvis|hey friday|friday|ok jarvis|ok friday)\b/gi, '').trim();
+
+          if (!withoutWake || withoutWake.length < 2) {
+            // Just "Hey Jarvis" -> Siri-style response!
+            clearTimeout(followupTimeout);
+            awaitingFollowupCommand = true;
+            followupTimeout = setTimeout(() => {
+              awaitingFollowupCommand = false;
+            }, 9000);
+
+            setStatus('WAKING');
+            addFeedItem('DEEPAK', transcript, 'user');
+            addFeedItem(currentPersona, 'Yes, Sir? Online and listening.', 'agent');
+            setStatus('LISTENING');
+
+            fetch(`${SERVER_URL}/api/command`, {
+              method: 'POST',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({command: 'Hey Jarvis', source: 'voice'})
+            }).catch(() => {});
+            return;
+          }
+
+          // User said "Hey Jarvis, <command>" together
+          clearTimeout(followupTimeout);
+          awaitingFollowupCommand = false;
+          executeCommand(transcript, "voice");
+          return;
+        }
+
+        // No wake word in this phrase
+        if (awaitingFollowupCommand) {
+          clearTimeout(followupTimeout);
+          awaitingFollowupCommand = false;
+          executeCommand(transcript, "voice");
+        } else {
+          console.log('[Filtered Ambient Speech]:', transcript);
+        }
+      };
+
+      webRecognizer.onerror = (e) => {
+        console.warn('Speech recognizer notification:', e.error);
+        if (e.error === 'not-allowed') {
+          continuousWakeActive = false;
+          updateWakePillUI(false);
+          document.getElementById('mic-btn').classList.remove('active');
+        }
+      };
+
+      webRecognizer.onend = () => {
+        if (continuousWakeActive) {
+          setTimeout(() => {
+            if (continuousWakeActive) {
+              try { webRecognizer.start(); } catch (err) {}
+            }
+          }, 200);
+        } else {
+          updateWakePillUI(false);
+          document.getElementById('mic-btn').classList.remove('active');
+          if (currentStatus === 'LISTENING') setStatus('STANDBY');
+        }
+      };
+    }
+
+    function updateWakePillUI(active) {
+      const pill = document.getElementById('wake-listener-pill');
+      if (!pill) return;
+      if (active) {
+        pill.className = 'status-pill status-online';
+        pill.innerHTML = '🎙️ HEY JARVIS: ● ALWAYS LISTENING';
+        pill.style.background = 'rgba(0, 240, 255, 0.15)';
+        pill.style.borderColor = 'var(--cyan)';
+        pill.style.color = 'var(--cyan)';
+        pill.style.boxShadow = '0 0 12px rgba(0, 240, 255, 0.4)';
+      } else {
+        pill.className = 'status-pill status-offline';
+        pill.innerHTML = '🎙️ HEY JARVIS: ○ PAUSED (CLICK TO START)';
+        pill.style.background = 'rgba(255, 75, 75, 0.1)';
+        pill.style.borderColor = 'var(--red)';
+        pill.style.color = 'var(--red)';
+        pill.style.boxShadow = 'none';
+      }
+    }
+
+    function toggleWakeWordListener() {
+      if (!webRecognizer) {
+        alert("Speech Recognition is not supported by your current browser. Please launch in Google Chrome.");
+        return;
+      }
+      continuousWakeActive = !continuousWakeActive;
+      if (continuousWakeActive) {
+        try { webRecognizer.start(); } catch (e) {}
+        updateWakePillUI(true);
+      } else {
+        try { webRecognizer.stop(); } catch (e) {}
+        updateWakePillUI(false);
+      }
+    }
+
+    function toggleWebMic() {
+      toggleWakeWordListener();
+    }
+
+    // Auto-engage wake word listener on first user interaction with the window
+    window.addEventListener('click', () => {
+      if (webRecognizer && continuousWakeActive) {
+        try { webRecognizer.start(); } catch (e) {}
+      }
+    }, { once: true });
+
+    // Backend Logs Stream & Terminal Runner (View 7)
+    async function fetchBackendLogs() {
+      const box = document.getElementById('backend-logs-container');
+      if (!box) return;
+      try {
+        const res = await fetch(`${SERVER_URL}/api/logs`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.pid) {
+            document.getElementById('backend-pid-label').textContent = `PID: ${data.pid}`;
+          }
+          if (data.model) {
+            document.getElementById('backend-model-label').textContent = `MODEL: ${data.model}`;
+          }
+          const pill = document.getElementById('backend-engine-pill');
+          if (pill) {
+            pill.className = 'status-pill status-online';
+            pill.textContent = '● RUNNING';
+          }
+          if (data.logs && data.logs.length > 0) {
+            box.innerHTML = data.logs.map(l => {
+              let col = '#c8e0ee';
+              if (l.includes('USER:')) col = '#00f0ff';
+              else if (l.includes('J.A.R.V.I.S.:') || l.includes('F.R.I.D.A.Y.:')) col = '#ffb700';
+              else if (l.includes('ACTION:')) col = '#3dc789';
+              return `<div style="margin-bottom:3px; color:${col};">${escapeHtml(l)}</div>`;
+            }).join('');
+            box.scrollTop = box.scrollHeight;
+          }
+        }
+      } catch (e) {
+        const pill = document.getElementById('backend-engine-pill');
+        if (pill) {
+          pill.className = 'status-pill status-offline';
+          pill.textContent = '● OFFLINE';
+        }
+      }
+    }
+
+    function escapeHtml(text) {
+      return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    async function runTerminalCommand() {
+      const input = document.getElementById('terminal-cmd-input');
+      const cmd = input.value.trim();
+      if (!cmd) return;
+      quickTerminal(cmd);
+      input.value = '';
+    }
+
+    async function quickTerminal(cmd) {
+      const outBox = document.getElementById('terminal-output-box');
+      outBox.innerHTML += `\n<span style="color:var(--cyan);">$ ${escapeHtml(cmd)}</span>\n[Executing...]`;
+      outBox.scrollTop = outBox.scrollHeight;
+
+      try {
+        const res = await fetch(`${SERVER_URL}/api/terminal`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({command: cmd})
+        });
+        if (res.ok) {
+          const data = await res.json();
+          outBox.innerHTML += `\n${escapeHtml(data.output)}\n`;
+        } else {
+          outBox.innerHTML += `\n[Command error or non-zero exit status]\n`;
+        }
+      } catch (err) {
+        outBox.innerHTML += `\n[Error communicating with backend terminal: ${err.message}]\n`;
+      }
+      outBox.scrollTop = outBox.scrollHeight;
+    }
+
+    document.getElementById('terminal-cmd-input')?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') runTerminalCommand();
+    });
+
+    async function restartBackendAPI() {
+      if (!confirm("Restart J.A.R.V.I.S. backend process?")) return;
+      addFeedItem('SYSTEM', 'Requesting backend restart...', 'system');
+      try {
+        await fetch(`${SERVER_URL}/api/backend/restart`, {method: 'POST'});
+      } catch(e) {}
+      setTimeout(() => { location.reload(); }, 2000);
+    }
+
+    async function shutdownBackendAPI() {
+      if (!confirm("Power down J.A.R.V.I.S. agent?")) return;
+      addFeedItem('SYSTEM', 'Shutting down backend agent...', 'system');
+      try {
+        await fetch(`${SERVER_URL}/api/backend/shutdown`, {method: 'POST'});
+      } catch(e) {}
+      setTimeout(() => {
+        setBackendIndicator(false);
+        const pill = document.getElementById('backend-engine-pill');
+        if (pill) {
+          pill.className = 'status-pill status-offline';
+          pill.textContent = '● OFFLINE';
+        }
+      }, 1000);
+    }
+
+    // Auto-refresh backend logs if backend tab is open
+    setInterval(() => {
+      const backendTab = document.getElementById('view-backend');
+      if (backendTab && backendTab.classList.contains('active')) {
+        fetchBackendLogs();
+      }
+    }, 2000);
+  </script>
+</body>
+</html>

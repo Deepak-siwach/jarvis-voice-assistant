@@ -1,0 +1,24 @@
+{
+  "status": "STANDBY",
+  "chip": "Apple M5",
+  "cpu": 0,
+  "ram": 68,
+  "ram_details": "7.6 / 16.0 GB Unified",
+  "battery": "13%",
+  "power": "Charging",
+  "persona": "JARVIS",
+  "contacts": {
+    "dad": "",
+    "mom": "+919871580938",
+    "father": "",
+    "dad:": "9812440316"
+  },
+  "new_message": {
+    "id": 6,
+    "sender": "J.A.R.V.I.S.",
+    "text": "Opening Moodle, Sir.",
+    "type": "agent"
+  },
+  "active_timer": null,
+  "timestamp": 1791049381.4437912
+}
